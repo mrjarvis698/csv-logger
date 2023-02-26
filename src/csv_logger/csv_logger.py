@@ -25,47 +25,6 @@ class CsvFormatter(logging.Formatter):
         record.msg = self.format_msg(record.msg)
         return logging.Formatter.format(self, record)
 
-
-class CsvRotatingFileHandler(RotatingFileHandler):
-
-    def __init__(
-            self,  #
-            fmt,
-            datefmt,
-            filename,
-            max_size,
-            max_files,
-            header=None,
-            delimiter=','):
-        # Format header string if needed
-        self._header = header and CsvFormatter(fmt, datefmt, delimiter).format_msg(header)
-        # check if file exists
-        self.file_pre_exists = path.exists(filename)
-        # call parent file handler __init__
-        RotatingFileHandler.__init__(self, filename, maxBytes=max_size, backupCount=max_files)
-        self.formatter = CsvFormatter(fmt, datefmt, delimiter)
-        # Write the header if delay is False and a file stream was created.
-        if self.stream is not None and not self.file_pre_exists:
-            self.stream.write('%s\n' % self._header)
-
-    def rotation_filename(self, default_name):
-        ''' make log files counter before the .csv extension '''
-        s = default_name.rsplit('.', 2)
-        return '{}_{:0{}d}.csv'.format(s[0], int(s[-1]), self.backupCount // 10 + 1)
-
-    def doRollover(self):
-        ''' prepend header string to each log file '''
-        RotatingFileHandler.doRollover(self)
-        if self._header is None:
-            return
-        # temporarily overwrite format function with a straight pass-through lambda function
-        # handle header without formatting, then reset format function to what it was
-        f = self.formatter.format
-        self.formatter.format = lambda x: x
-        self.handle(self._header)
-        self.formatter.format = f
-
-
 class CsvLogger(logging.Logger):
 
     def __init__(self,
@@ -75,9 +34,7 @@ class CsvLogger(logging.Logger):
                  add_level_names=[],
                  add_level_nums=None,
                  fmt: str = '%(asctime)s,%(message)s',
-                 datefmt: str = '%Y/%m/%d %H:%M:%S',
-                 max_size: int = 10485760,
-                 max_files: int = 10,
+                 datefmt: str = '%Y/%m/%d %H:%M:%S', 
                  header=None):
         """logger class to perform the csv logging
 
@@ -89,8 +46,6 @@ class CsvLogger(logging.Logger):
             add_level_nums (list[int], optional): assigns specific nums to add_level_names (default nums if not provided: 100,99,98..)
             fmt (str, optional): output format, accepts parameters 'asctime' 'message' 'levelname'. Defaults to '%(asctime)s,%(message)s'.
             datefmt (str, optional): date format for first column of logs. Defaults to '%Y/%m/%d %H:%M:%S'.
-            max_size (int, optional): max size of each log file in bytes. Defaults to 10485760.
-            max_files (int, optional): max file count. Defaults to 10.
             header (list[str], optional): header to prepend to csv files. Defaults to None
         """
         self.filename = filename
@@ -111,9 +66,6 @@ class CsvLogger(logging.Logger):
         add_level_nums = add_level_nums or [100 - i for i in range(len(add_level_names))]
         for level_num, level_name in zip(add_level_nums, add_level_names):
             self.addLoggingLevel(level_name, level_num, level_name)
-
-        handler = CsvRotatingFileHandler(fmt, datefmt, filename, max_size, max_files, header, delimiter)
-        self.addHandler(handler)
 
     def addLoggingLevel(self, levelName, levelNum, methodName=None):
         """
